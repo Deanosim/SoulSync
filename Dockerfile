@@ -70,4 +70,4 @@ ENV UMASK=022
 
 # Set entrypoint and default command
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python3 -m venv /lsiopy", "web_server.py"]
+CMD ["python3", "web_server.py"]
