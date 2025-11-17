@@ -30,7 +30,7 @@ RUN python3 -m venv /lsiopy && \
       pip \
       wheel && \
     pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ -r \
-    requirements-webui.txt -r
+    requirements-webui.txt
 
 # Copy application code
 COPY . .
