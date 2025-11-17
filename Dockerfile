@@ -8,8 +8,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3-minimal \
-    python3-pip \
+    python3-venv \
     gcc \
     libc6-dev \
     libffi-dev \
@@ -24,9 +23,16 @@ RUN apt-get update && apt-get install -y \
 RUN useradd --create-home --shell /bin/bash --uid 1000 soulsync
 
 # Copy requirements and install Python dependencies
+
 COPY requirements-webui.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-webui.txt
+RUN python3 -m venv /lsiopy && \
+    pip install -U --no-cache-dir \
+      pip \
+      wheel && \
+    pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ -r \
+    requirements.txt -r \
+    optional-requirements.txt \
+    requirements-webui.txt && \
 
 # Copy application code
 COPY . .
@@ -66,4 +72,4 @@ ENV UMASK=022
 
 # Set entrypoint and default command
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "web_server.py"]
+CMD ["python3 -m venv /lsiopy", "web_server.py"]
