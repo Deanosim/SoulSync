@@ -9,6 +9,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3-minimal \
+    python3-pip \
     gcc \
     libc6-dev \
     libffi-dev \
