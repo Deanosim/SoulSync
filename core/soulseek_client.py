@@ -222,11 +222,6 @@ class SoulseekClient:
         
         # Apply Docker URL resolution if running in container
         slskd_url = config.get('slskd_url')
-        import os
-        if os.path.exists('/.dockerenv') and 'localhost' in slskd_url:
-            slskd_url = slskd_url.replace('localhost', 'host.docker.internal')
-            logger.info(f"Docker detected, using {slskd_url} for slskd connection")
-        
         self.base_url = slskd_url.rstrip('/')
         self.api_key = config.get('api_key', '')
         
