@@ -227,14 +227,6 @@ class SoulseekClient:
         
         # Handle download path with Docker translation
         download_path_str = config.get('download_path', './downloads')
-        if os.path.exists('/.dockerenv') and len(download_path_str) >= 3 and download_path_str[1] == ':' and download_path_str[0].isalpha():
-            # Convert Windows path (E:/path) to WSL mount path (/mnt/e/path)
-            drive_letter = download_path_str[0].lower()
-            rest_of_path = download_path_str[2:].replace('\\', '/')  # Remove E: and convert backslashes
-            download_path_str = f"/host/mnt/{drive_letter}{rest_of_path}"
-            logger.info(f"Docker detected, using {download_path_str} for downloads")
-        
-        self.download_path = Path(download_path_str)
         self.download_path.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Soulseek client configured with slskd at {self.base_url}")
