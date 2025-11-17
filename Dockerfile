@@ -24,13 +24,13 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 soulsync
 
 # Copy requirements and install Python dependencies
 
-COPY requirements-webui.txt /lsiopy
+COPY requirements-webui.txt .
 RUN python3 -m venv /lsiopy && \
     pip install -U --no-cache-dir \
       pip \
       wheel && \
     pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ -r \
-    requirements-webui.txt
+    /app/requirements-webui.txt
 
 # Copy application code
 COPY . .
