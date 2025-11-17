@@ -1,20 +1,23 @@
 # SoulSync WebUI Dockerfile
 # Multi-architecture support for AMD64 and ARM64
 
-FROM python:3.11-slim
+FROM ghcr.io/linuxserver/baseimage-ubuntu:noble
 
 # Set working directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    python3-minimal \
     gcc \
     libc6-dev \
     libffi-dev \
     libssl-dev \
     curl \
     gosu \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get autoremove \
+    && apt-get autoclean
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash --uid 1000 soulsync
