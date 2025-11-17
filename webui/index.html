@@ -1708,6 +1708,76 @@
                         </div>
                     </div>
 
+                    <!-- Seasonal Albums Section (Auto-shows based on current season) -->
+                    <div class="discover-section" id="seasonal-albums-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <h2 class="discover-section-title" id="seasonal-albums-title">Seasonal</h2>
+                            <p class="discover-section-subtitle" id="seasonal-albums-subtitle">Seasonal music</p>
+                        </div>
+                        <div class="discover-carousel" id="seasonal-albums-carousel">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Seasonal Playlist Section (Auto-shows based on current season) -->
+                    <div class="discover-section" id="seasonal-playlist-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <div>
+                                <h2 class="discover-section-title" id="seasonal-playlist-title">Seasonal Mix</h2>
+                                <p class="discover-section-subtitle" id="seasonal-playlist-subtitle">Curated seasonal playlist</p>
+                            </div>
+                            <div class="discover-section-actions">
+                                <button class="action-button secondary" onclick="openDownloadModalForDiscoverPlaylist('seasonal_playlist', 'Seasonal Mix')" title="Download missing tracks">
+                                    <span class="button-icon">↓</span>
+                                    <span class="button-text">Download</span>
+                                </button>
+                                <button class="action-button primary" id="seasonal-playlist-sync-btn" onclick="startDiscoverPlaylistSync('seasonal_playlist', 'Seasonal Mix')" title="Sync to media server">
+                                    <span class="button-icon">⟳</span>
+                                    <span class="button-text">Sync</span>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Sync Status Display -->
+                        <div class="discover-sync-status" id="seasonal-playlist-sync-status" style="display: none;">
+                            <div class="sync-status-content">
+                                <div class="sync-status-label">
+                                    <span class="sync-icon">⟳</span>
+                                    <span class="sync-text">Syncing Seasonal Mix...</span>
+                                </div>
+                                <div class="sync-status-progress">
+                                    <div class="sync-progress-text">
+                                        <span id="seasonal-playlist-sync-progress">0/0 tracks</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="discover-playlist-container compact" id="seasonal-playlist">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Recently Added Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <h2 class="discover-section-title">🆕 Recently Added</h2>
+                            <p class="discover-section-subtitle">Latest additions to your library</p>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-recently-added">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Daily Mixes Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <h2 class="discover-section-title">🎵 Daily Mixes</h2>
+                            <p class="discover-section-subtitle">Personalized mixes based on your taste</p>
+                        </div>
+                        <div class="discover-more-playlists-grid" id="daily-mixes-grid">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
                     <!-- Fresh Tape Section -->
                     <div class="discover-section">
                         <div class="discover-section-header">
@@ -1792,6 +1862,194 @@
                             <div class="discover-loading">
                                 <div class="loading-spinner"></div>
                                 <p>Loading the archives...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Popular Picks Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <div>
+                                <h2 class="discover-section-title">🔥 Popular Picks</h2>
+                                <p class="discover-section-subtitle">Trending tracks from new discoveries</p>
+                            </div>
+                            <div class="discover-section-actions">
+                                <button class="action-button secondary" onclick="openDownloadModalForDiscoverPlaylist('popular_picks', 'Popular Picks')" title="Download missing tracks">
+                                    <span class="button-icon">↓</span>
+                                    <span class="button-text">Download</span>
+                                </button>
+                                <button class="action-button primary" id="popular-picks-sync-btn" onclick="startDiscoverPlaylistSync('popular_picks', 'Popular Picks')" title="Sync to media server">
+                                    <span class="button-icon">⟳</span>
+                                    <span class="button-text">Sync</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-popular-picks">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Hidden Gems Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <div>
+                                <h2 class="discover-section-title">🌟 Hidden Gems</h2>
+                                <p class="discover-section-subtitle">Underground discoveries waiting for you</p>
+                            </div>
+                            <div class="discover-section-actions">
+                                <button class="action-button secondary" onclick="openDownloadModalForDiscoverPlaylist('hidden_gems', 'Hidden Gems')" title="Download missing tracks">
+                                    <span class="button-icon">↓</span>
+                                    <span class="button-text">Download</span>
+                                </button>
+                                <button class="action-button primary" id="hidden-gems-sync-btn" onclick="startDiscoverPlaylistSync('hidden_gems', 'Hidden Gems')" title="Sync to media server">
+                                    <span class="button-icon">⟳</span>
+                                    <span class="button-text">Sync</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-hidden-gems">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Your Top 50 Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <h2 class="discover-section-title">🏆 Your Top 50</h2>
+                            <p class="discover-section-subtitle">All-time favorites from your library</p>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-top-tracks">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Forgotten Favorites Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <h2 class="discover-section-title">💎 Forgotten Favorites</h2>
+                            <p class="discover-section-subtitle">Rediscover tracks you used to love</p>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-forgotten-favorites">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Discovery Shuffle Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <div>
+                                <h2 class="discover-section-title">🔀 Discovery Shuffle</h2>
+                                <p class="discover-section-subtitle">Random tracks from your discovery pool - different every time</p>
+                            </div>
+                            <div class="discover-section-actions">
+                                <button class="action-button secondary" onclick="openDownloadModalForDiscoverPlaylist('discovery_shuffle', 'Discovery Shuffle')" title="Download missing tracks">
+                                    <span class="button-icon">↓</span>
+                                    <span class="button-text">Download</span>
+                                </button>
+                                <button class="action-button primary" id="discovery-shuffle-sync-btn" onclick="startDiscoverPlaylistSync('discovery_shuffle', 'Discovery Shuffle')" title="Sync to media server">
+                                    <span class="button-icon">⟳</span>
+                                    <span class="button-text">Sync</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-discovery-shuffle">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Familiar Favorites Section -->
+                    <div class="discover-section" style="display: none;">
+                        <div class="discover-section-header">
+                            <div>
+                                <h2 class="discover-section-title">❤️ Familiar Favorites</h2>
+                                <p class="discover-section-subtitle">Your reliable go-to tracks</p>
+                            </div>
+                            <div class="discover-section-actions">
+                                <button class="action-button secondary" onclick="openDownloadModalForDiscoverPlaylist('familiar_favorites', 'Familiar Favorites')" title="Download missing tracks">
+                                    <span class="button-icon">↓</span>
+                                    <span class="button-text">Download</span>
+                                </button>
+                                <button class="action-button primary" id="familiar-favorites-sync-btn" onclick="startDiscoverPlaylistSync('familiar_favorites', 'Familiar Favorites')" title="Sync to media server">
+                                    <span class="button-icon">⟳</span>
+                                    <span class="button-text">Sync</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="discover-playlist-container compact" id="personalized-familiar-favorites">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Build a Playlist Section -->
+                    <div class="discover-section">
+                        <div class="discover-section-header">
+                            <h2 class="discover-section-title">🎨 Build a Playlist</h2>
+                            <p class="discover-section-subtitle">Create a custom playlist from your favorite artists</p>
+                        </div>
+                        <div class="build-playlist-container">
+                            <!-- Artist Search -->
+                            <div class="build-playlist-search-section">
+                                <input
+                                    type="text"
+                                    id="build-playlist-search"
+                                    placeholder="Search for artists (1-5 artists)..."
+                                    oninput="searchBuildPlaylistArtists()"
+                                />
+                                <div id="build-playlist-search-results" class="build-playlist-search-results"></div>
+                            </div>
+
+                            <!-- Selected Artists -->
+                            <div class="build-playlist-selected-section">
+                                <h3>Selected Artists:</h3>
+                                <div id="build-playlist-selected-artists" class="build-playlist-selected-artists">
+                                    <div class="build-playlist-no-selection">No artists selected. Search and select 1-5 artists.</div>
+                                </div>
+                            </div>
+
+                            <!-- Generate Button -->
+                            <div class="build-playlist-actions">
+                                <button
+                                    id="build-playlist-generate-btn"
+                                    class="build-playlist-generate-btn"
+                                    onclick="generateBuildPlaylist()"
+                                    disabled
+                                    style="opacity: 0.5;"
+                                >
+                                    Generate Playlist (50 tracks)
+                                </button>
+                                <div id="build-playlist-loading" class="build-playlist-loading" style="display: none;">
+                                    <div class="loading-spinner"></div>
+                                    <p>Building your playlist...</p>
+                                </div>
+                            </div>
+
+                            <!-- Generated Playlist Results -->
+                            <div id="build-playlist-results-wrapper" style="display: none;">
+                                <!-- Playlist Header with Actions -->
+                                <div class="discover-section-header" style="margin-top: 20px;">
+                                    <div>
+                                        <h3 id="build-playlist-results-title" style="margin: 0; color: #fff; font-size: 18px;">Generated Playlist</h3>
+                                        <p id="build-playlist-results-subtitle" style="margin: 4px 0 0 0; color: #999; font-size: 13px;"></p>
+                                    </div>
+                                    <div class="discover-section-actions">
+                                        <button class="action-button secondary" onclick="openDownloadModalForBuildPlaylist()" title="Download missing tracks">
+                                            <span class="button-icon">↓</span>
+                                            <span class="button-text">Download</span>
+                                        </button>
+                                        <button class="action-button primary" id="build-playlist-sync-btn" onclick="startDiscoverPlaylistSync('build_playlist', 'Custom Playlist')" title="Sync to media server">
+                                            <span class="button-icon">⟳</span>
+                                            <span class="button-text">Sync</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Metadata Display -->
+                                <div id="build-playlist-metadata-display"></div>
+
+                                <!-- Track List -->
+                                <div id="build-playlist-results" class="discover-playlist-container compact">
+                                    <!-- Generated playlist will appear here -->
+                                </div>
                             </div>
                         </div>
                     </div>

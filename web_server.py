@@ -11606,24 +11606,26 @@ def get_spotify_playlists():
     try:
         playlists = spotify_client.get_user_playlists_metadata_only()
         sync_statuses = _load_sync_status_file()
-        
+
         playlist_data = []
+
+        # Add regular playlists first
         for p in playlists:
             status_info = sync_statuses.get(p.id, {})
             sync_status = "Never Synced"
             # Handle snapshot_id safely - may not exist in core Playlist class
             playlist_snapshot = getattr(p, 'snapshot_id', '')
-            
+
             print(f"🔍 Processing playlist: {p.name} (ID: {p.id})")
             print(f"   - Playlist snapshot: '{playlist_snapshot}'")
             print(f"   - Status info: {status_info}")
-            
+
             if 'last_synced' in status_info:
                 stored_snapshot = status_info.get('snapshot_id')
                 last_sync_time = datetime.fromisoformat(status_info['last_synced']).strftime('%b %d, %H:%M')
                 print(f"   - Stored snapshot: '{stored_snapshot}'")
                 print(f"   - Snapshots match: {playlist_snapshot == stored_snapshot}")
-                
+
                 if playlist_snapshot != stored_snapshot:
                     sync_status = f"Last Sync: {last_sync_time}"
                     print(f"   - Result: Needs Sync (showing: {sync_status})")
@@ -11635,11 +11637,43 @@ def get_spotify_playlists():
 
             playlist_data.append({
                 "id": p.id, "name": p.name, "owner": p.owner,
-                "track_count": p.total_tracks, 
+                "track_count": p.total_tracks,
                 "image_url": getattr(p, 'image_url', None),
-                "sync_status": sync_status, 
+                "sync_status": sync_status,
                 "snapshot_id": playlist_snapshot
             })
+
+        # Add virtual "Liked Songs" playlist at the END (just count, no full fetch)
+        try:
+            liked_songs_count = spotify_client.get_saved_tracks_count()
+            if liked_songs_count > 0:
+                liked_songs_id = "spotify:liked-songs"
+                status_info = sync_statuses.get(liked_songs_id, {})
+                sync_status = "Never Synced"
+
+                if 'last_synced' in status_info:
+                    last_sync_time = datetime.fromisoformat(status_info['last_synced']).strftime('%b %d, %H:%M')
+                    sync_status = f"Synced: {last_sync_time}"
+
+                # Get user info for owner name
+                user_info = spotify_client.get_user_info()
+                owner_name = user_info.get('display_name', 'You') if user_info else 'You'
+
+                # Add Liked Songs as LAST playlist
+                playlist_data.append({
+                    "id": liked_songs_id,
+                    "name": "Liked Songs",
+                    "owner": owner_name,
+                    "track_count": liked_songs_count,
+                    "image_url": None,  # Spotify doesn't provide image for Liked Songs
+                    "sync_status": sync_status,
+                    "snapshot_id": ""  # Liked Songs doesn't have a snapshot_id
+                })
+                print(f"🔍 Added virtual 'Liked Songs' playlist with {liked_songs_count} tracks (count only)")
+        except Exception as liked_error:
+            print(f"⚠️ Failed to add Liked Songs playlist: {liked_error}")
+            # Don't fail the entire request if Liked Songs fails
+
         return jsonify(playlist_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -11650,6 +11684,28 @@ def get_playlist_tracks(playlist_id):
     if not spotify_client or not spotify_client.is_authenticated():
         return jsonify({"error": "Spotify not authenticated."}), 401
     try:
+        # Handle special "Liked Songs" virtual playlist
+        if playlist_id == "spotify:liked-songs":
+            saved_tracks = spotify_client.get_saved_tracks()
+            user_info = spotify_client.get_user_info()
+            owner_name = user_info.get('display_name', 'You') if user_info else 'You'
+
+            # Create virtual playlist dict for Liked Songs
+            playlist_dict = {
+                'id': 'spotify:liked-songs',
+                'name': 'Liked Songs',
+                'description': 'Your saved tracks on Spotify',
+                'owner': owner_name,
+                'public': False,
+                'collaborative': False,
+                'track_count': len(saved_tracks),
+                'image_url': None,
+                'snapshot_id': '',
+                'tracks': [{'id': t.id, 'name': t.name, 'artists': t.artists, 'album': t.album, 'duration_ms': t.duration_ms, 'popularity': t.popularity} for t in saved_tracks]
+            }
+            return jsonify(playlist_dict)
+
+        # Handle regular playlists
         # This reuses the robust track fetching logic from your GUI's sync.py
         full_playlist = spotify_client.get_playlist_by_id(playlist_id)
         if not full_playlist:
@@ -14627,6 +14683,431 @@ def get_discover_weekly():
 
     except Exception as e:
         print(f"Error getting discovery weekly: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ========================================
+# SEASONAL DISCOVERY ENDPOINTS
+# ========================================
+
+@app.route('/api/discover/seasonal/current', methods=['GET'])
+def get_current_seasonal_content():
+    """Auto-detect and return current season's content"""
+    try:
+        from core.seasonal_discovery import get_seasonal_discovery_service
+
+        database = get_database()
+        seasonal_service = get_seasonal_discovery_service(spotify_client, database)
+
+        # Get current season
+        current_season = seasonal_service.get_current_season()
+
+        if not current_season:
+            return jsonify({"success": True, "season": None, "albums": [], "playlist_available": False})
+
+        # Get seasonal config
+        from core.seasonal_discovery import SEASONAL_CONFIG
+        config = SEASONAL_CONFIG[current_season]
+
+        # Get albums (increased limit for more variety)
+        albums = seasonal_service.get_seasonal_albums(current_season, limit=40)
+
+        # Check if playlist is curated
+        playlist_track_ids = seasonal_service.get_curated_seasonal_playlist(current_season)
+
+        return jsonify({
+            "success": True,
+            "season": current_season,
+            "name": config['name'],
+            "description": config['description'],
+            "icon": config['icon'],
+            "albums": albums,
+            "playlist_available": len(playlist_track_ids) > 0
+        })
+
+    except Exception as e:
+        print(f"Error getting current seasonal content: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/seasonal/<season_key>/albums', methods=['GET'])
+def get_seasonal_albums(season_key):
+    """Get albums for a specific season"""
+    try:
+        from core.seasonal_discovery import get_seasonal_discovery_service, SEASONAL_CONFIG
+
+        if season_key not in SEASONAL_CONFIG:
+            return jsonify({"success": False, "error": "Invalid season"}), 400
+
+        database = get_database()
+        seasonal_service = get_seasonal_discovery_service(spotify_client, database)
+
+        albums = seasonal_service.get_seasonal_albums(season_key, limit=40)
+        config = SEASONAL_CONFIG[season_key]
+
+        return jsonify({
+            "success": True,
+            "season": season_key,
+            "name": config['name'],
+            "description": config['description'],
+            "icon": config['icon'],
+            "albums": albums
+        })
+
+    except Exception as e:
+        print(f"Error getting seasonal albums: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/seasonal/<season_key>/playlist', methods=['GET'])
+def get_seasonal_playlist(season_key):
+    """Get curated playlist for a specific season"""
+    try:
+        from core.seasonal_discovery import get_seasonal_discovery_service, SEASONAL_CONFIG
+
+        if season_key not in SEASONAL_CONFIG:
+            return jsonify({"success": False, "error": "Invalid season"}), 400
+
+        database = get_database()
+        seasonal_service = get_seasonal_discovery_service(spotify_client, database)
+
+        # Get curated track IDs
+        track_ids = seasonal_service.get_curated_seasonal_playlist(season_key)
+
+        if not track_ids:
+            return jsonify({"success": True, "tracks": []})
+
+        # Fetch track details from discovery pool or seasonal tracks
+        tracks = []
+        with database._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for track_id in track_ids:
+                # Try seasonal_tracks first
+                cursor.execute("""
+                    SELECT
+                        spotify_track_id,
+                        track_name,
+                        artist_name,
+                        album_name,
+                        album_cover_url,
+                        duration_ms,
+                        popularity
+                    FROM seasonal_tracks
+                    WHERE spotify_track_id = ?
+                """, (track_id,))
+
+                result = cursor.fetchone()
+
+                if result:
+                    tracks.append(dict(result))
+                else:
+                    # Try discovery_pool as fallback
+                    cursor.execute("""
+                        SELECT
+                            spotify_track_id,
+                            track_name,
+                            artist_name,
+                            album_name,
+                            album_cover_url,
+                            duration_ms,
+                            popularity
+                        FROM discovery_pool
+                        WHERE spotify_track_id = ?
+                    """, (track_id,))
+
+                    result = cursor.fetchone()
+                    if result:
+                        tracks.append(dict(result))
+
+        config = SEASONAL_CONFIG[season_key]
+
+        return jsonify({
+            "success": True,
+            "season": season_key,
+            "name": config['name'],
+            "description": config['description'],
+            "icon": config['icon'],
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting seasonal playlist: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/seasonal/refresh', methods=['POST'])
+def refresh_seasonal_content():
+    """Manually trigger seasonal content refresh (admin function)"""
+    try:
+        from core.seasonal_discovery import get_seasonal_discovery_service
+
+        database = get_database()
+        seasonal_service = get_seasonal_discovery_service(spotify_client, database)
+
+        # Populate all seasons in background thread
+        import threading
+        def populate_all():
+            try:
+                seasonal_service.populate_all_seasons()
+            except Exception as e:
+                print(f"Error in background seasonal population: {e}")
+
+        thread = threading.Thread(target=populate_all, daemon=True)
+        thread.start()
+
+        return jsonify({"success": True, "message": "Seasonal content refresh started"})
+
+    except Exception as e:
+        print(f"Error refreshing seasonal content: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ========================================
+# PERSONALIZED PLAYLISTS ENDPOINTS
+# ========================================
+
+@app.route('/api/discover/personalized/recently-added', methods=['GET'])
+def get_recently_added_playlist():
+    """Get recently added tracks from library"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        tracks = service.get_recently_added(limit=50)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting recently added playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/top-tracks', methods=['GET'])
+def get_top_tracks_playlist():
+    """Get user's all-time top tracks"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        tracks = service.get_top_tracks(limit=50)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting top tracks playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/forgotten-favorites', methods=['GET'])
+def get_forgotten_favorites_playlist():
+    """Get forgotten favorites - tracks you loved but haven't played recently"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        tracks = service.get_forgotten_favorites(limit=50)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting forgotten favorites playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/decade/<int:decade>', methods=['GET'])
+def get_decade_playlist(decade):
+    """Get tracks from a specific decade"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        tracks = service.get_decade_playlist(decade, limit=100)
+
+        return jsonify({
+            "success": True,
+            "decade": decade,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting decade playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/popular-picks', methods=['GET'])
+def get_popular_picks_playlist():
+    """Get high popularity tracks from discovery pool"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        tracks = service.get_popular_picks(limit=50)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting popular picks playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/hidden-gems', methods=['GET'])
+def get_hidden_gems_playlist():
+    """Get hidden gems (low popularity) from discovery pool"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        tracks = service.get_hidden_gems(limit=50)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting hidden gems playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/daily-mixes', methods=['GET'])
+def get_daily_mixes():
+    """Get all Daily Mix playlists (hybrid library + discovery)"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        mixes = service.get_all_daily_mixes(max_mixes=4)
+
+        return jsonify({
+            "success": True,
+            "mixes": mixes
+        })
+
+    except Exception as e:
+        print(f"Error getting daily mixes: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/discovery-shuffle', methods=['GET'])
+def get_discovery_shuffle():
+    """Get Discovery Shuffle playlist - random tracks from discovery pool"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        limit = int(request.args.get('limit', 50))
+        tracks = service.get_discovery_shuffle(limit=limit)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting discovery shuffle playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/personalized/familiar-favorites', methods=['GET'])
+def get_familiar_favorites():
+    """Get Familiar Favorites playlist - reliable go-to tracks"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        limit = int(request.args.get('limit', 50))
+        tracks = service.get_familiar_favorites(limit=limit)
+
+        return jsonify({
+            "success": True,
+            "tracks": tracks
+        })
+
+    except Exception as e:
+        print(f"Error getting familiar favorites playlist: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/build-playlist/search-artists', methods=['GET'])
+def search_artists_for_playlist():
+    """Search for artists to use as seeds for custom playlist building"""
+    try:
+        query = request.args.get('query', '').strip()
+        if not query:
+            return jsonify({"success": False, "error": "Query required"}), 400
+
+        # Search Spotify for artists
+        results = spotify_client.sp.search(q=query, type='artist', limit=10)
+
+        artists = []
+        if results and 'artists' in results and 'items' in results['artists']:
+            for artist in results['artists']['items']:
+                artists.append({
+                    'id': artist['id'],
+                    'name': artist['name'],
+                    'image_url': artist['images'][0]['url'] if artist.get('images') else None
+                })
+
+        return jsonify({
+            "success": True,
+            "artists": artists
+        })
+
+    except Exception as e:
+        print(f"Error searching for artists: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/discover/build-playlist/generate', methods=['POST'])
+def generate_custom_playlist():
+    """Generate custom playlist from seed artists"""
+    try:
+        from core.personalized_playlists import get_personalized_playlists_service
+
+        data = request.get_json()
+        seed_artist_ids = data.get('seed_artist_ids', [])
+
+        if not seed_artist_ids or len(seed_artist_ids) < 1 or len(seed_artist_ids) > 5:
+            return jsonify({
+                "success": False,
+                "error": "Please provide between 1 and 5 seed artists"
+            }), 400
+
+        database = get_database()
+        service = get_personalized_playlists_service(database, spotify_client)
+
+        playlist_size = int(data.get('playlist_size', 50))
+        result = service.build_custom_playlist(seed_artist_ids, playlist_size=playlist_size)
+
+        return jsonify({
+            "success": True,
+            "playlist": result
+        })
+
+    except Exception as e:
+        print(f"Error generating custom playlist: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/metadata/start', methods=['POST'])
